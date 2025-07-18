@@ -204,18 +204,33 @@
       margin-left: 10px;
 
     }
-    .artist-name {
+    .artist-firstname {
       font-size: 1.23em;
       font-weight: 600;
       letter-spacing: 1px;
       color: #ffe066;
       margin-left: 1.2em;
     }
-    .artist-years {
+    .artist-lastname {
+      font-size: 1.23em;
+      font-weight: 600;
+      letter-spacing: 1px;
+      color: #ffe066;
+      margin-left: 1.2em;
+    }
+
+    .artist-date {
       font-size: 0.97em;
       color: #b8c1ec;
       margin-left: 5%;
     }
+
+    .artist-country {
+      font-size: 0.97em;
+      color: #b8c1ec;
+      margin-left: 5%;
+    }
+
     .dropdown {
       max-height: 0;
       overflow: scroll;
@@ -276,3 +291,4 @@
    
       #addArtistForm { min-width: 0; width: 98vw; padding: 1em 0.7em 1em 0.7em; }
     }
+

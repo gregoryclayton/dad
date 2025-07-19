@@ -11,7 +11,7 @@ $conn = new mysqli($host, $user, $password, $database);
 if ($conn->connect_error) {
     die('Connection failed: ' . $conn->connect_error);
 }
-$result = $conn->query("SELECT id, name, email, message FROM users ORDER BY id DESC");
+$result = $conn->query("SELECT id, pp, firstname, lastname, date, genre, country, bio, works, workslink, works2, workslink2, works3, workslink3, works3, workslink4, works4, workslink4, works5, workslink5, works6, workslink6, works7, workslink7, works8, workslink8, link1, link2, link3 FROM users ORDER BY id DESC");
 
 // Create json array from fetched data
 $jsonArray = array();
@@ -19,13 +19,55 @@ if ($result && $result->num_rows > 0) {
     while ($row = $result->fetch_assoc()) {
         // Normalize the row to match expected ARTIST fields.
         // If you want to support "years", "bio", "works", extend your DB and form accordingly.
+        
         $jsonArray[] = [
+            
             "id" => $row["id"],
-            "name" => $row["name"],
-            // If you want to use years, bio, works, you must have those columns in your DB and form!
-            "years" => "",
-            "bio" => $row["message"], // Use "message" as "bio" for now
-            "works" => [] // No works from DB, so leave empty array
+            "pp" => $row["pp"],
+            "firstname" => $row["firstname"],
+            "lastname" => $row["lastname"],
+            "date" => $row["date"],
+            "genre" => $row["genre"],
+            "country" => $row["country"],
+            "fact1" => $row["fact1"],
+            "fact2" => $row["fact2"],
+            "fact3" => $row["fact3"],
+            "bio" => $row["bio"], // Use "message" as "bio" for now
+            
+            "works1" => $row["works1"],
+            "workslink1" => $row["workslink1"],
+            "works2" => $row["works2"],
+            "workslink2" => $row["workslink2"],
+            "works3" => $row["works3"],
+            "workslink3" => $row["workslink3"],
+            "works4" => $row["works4"],
+            "workslink4" => $row["workslink4"],
+            "works5" => $row["works5"],
+            "workslink5" => $row["workslink5"],
+            "works6" => $row["works6"],
+            "workslink6" => $row["workslink6"],
+            "works7" => $row["works7"],
+            "workslink7" => $row["workslink7"],
+            "works8" => $row["works8"],
+            "workslink8" => $row["workslink8"],
+
+            "link1" => $row["link1"],
+            "link2" => $row["link2"],
+            "link3" => $row["link3"]
+           
+        ];
+    };
+};
+
+$jsonArray2 = array();
+if ($result && $result->num_rows > 0) {
+    while ($row = $result->fetch_assoc()) {
+        // Normalize the row to match expected ARTIST fields.
+        // If you want to support "years", "bio", "works", extend your DB and form accordingly.
+        $jsonArray2[] = [
+            
+            "works" => $row["works"],
+            "workslink" => $row["workslink"],
         ];
     }
 }
@@ -75,10 +117,42 @@ if ($result && $result->num_rows > 0) {
     </form>
   </div>
 
+  <footer style="background:#222; color:#eee; padding:2em 0; text-align:center; font-size:0.95em;">
+  <div style="margin-bottom:1em;">
+    <nav>
+      <a href="/index.html" style="color:#eee; margin:0 15px; text-decoration:none;">Home</a>
+      <a href="/about.html" style="color:#eee; margin:0 15px; text-decoration:none;">About</a>
+      <a href="/gallery.html" style="color:#eee; margin:0 15px; text-decoration:none;">Gallery</a>
+      <a href="/contact.html" style="color:#eee; margin:0 15px; text-decoration:none;">Contact</a>
+      <a href="/sitemap.xml" style="color:#eee; margin:0 15px; text-decoration:none;">Sitemap</a>
+    </nav>
+  </div>
+  <div style="margin-bottom:1em;">
+    <a href="https://twitter.com/" target="_blank" rel="noopener" style="margin:0 8px;">
+      <img src="https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/twitter.svg" alt="Twitter" height="22" style="vertical-align:middle; filter:invert(1);">
+    </a>
+    <a href="https://facebook.com/" target="_blank" rel="noopener" style="margin:0 8px;">
+      <img src="https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/facebook.svg" alt="Facebook" height="22" style="vertical-align:middle; filter:invert(1);">
+    </a>
+    <a href="https://instagram.com/" target="_blank" rel="noopener" style="margin:0 8px;">
+      <img src="https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/instagram.svg" alt="Instagram" height="22" style="vertical-align:middle; filter:invert(1);">
+    </a>
+    <a href="https://github.com/" target="_blank" rel="noopener" style="margin:0 8px;">
+      <img src="https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/github.svg" alt="GitHub" height="22" style="vertical-align:middle; filter:invert(1);">
+    </a>
+  </div>
+  <div>
+    &copy; 2025 Your Website Name. All Rights Reserved.
+  </div>
+</footer>
+
   <script>
     // Set a JS variable to the PHP-generated JSON array
     var ARTISTS = <?php echo json_encode($jsonArray, JSON_PRETTY_PRINT); ?>;
     console.log(ARTISTS); // You can use ARTISTS in your JS code
+
+    var SLIDES = <?php echo json_encode($jsonArray2, JSON_PRETTY_PRINT); ?>;
+    console.log(SLIDES); // You can use ARTISTS in your JS code
   </script>
 
   <script>
@@ -97,13 +171,13 @@ if ($result && $result->num_rows > 0) {
     let slideshowInterval = null;
 
     function showSlide(index) {
-      if (imageData.length === 0) {
+      if (SLIDES.length === 0) {
         imgElem.src = '';
         imgElem.alt = 'No images';
         return;
       }
-      current = (index + imageData.length) % imageData.length;
-      imgElem.src = imageData[current].url;
+      current = (index + SLIDES.length) % SLIDES.length;
+      imgElem.src = SLIDES[current].workslink;
       imgElem.alt = `Slide ${current + 1}`;
     }
 
@@ -139,7 +213,7 @@ if ($result && $result->num_rows > 0) {
     function getArtist(index) {
       if (index < ARTISTS.length) return ARTISTS[index];
       let base = ARTISTS[index % ARTISTS.length];
-      return base;
+     // return base;
     }
 
     // DOM Elements
@@ -156,24 +230,44 @@ if ($result && $result->num_rows > 0) {
       entry.setAttribute('data-idx', index);
 
       entry.innerHTML = `
-        <img class="artist-pp" src="" alt="Artist" />
-        <span class="artist-name">${artist.name || ""}</span>
-        <span class="artist-years">${artist.years || ""}</span>
+        <img class="artist-pp" src="${artist.pp}" alt="" />
+        <span class="artist-firstname">${artist.firstname || ""}</span>
+        <span class="artist-lastname">${artist.lastname || ""}</span>
+        <span class="artist-date">${artist.date || ""}</span>
+        <span class="artist-country">${artist.country || ""}</span>
+        <span class="artist-date">${artist.genre || ""}</span>
+
         <div class="dropdown">
           <h4>About</h4>
           <div>${artist.bio || ""}</div>
-          <h4>Works</h4>
+          
+       <h4>Works</h4>
           <div class="work-container">
           <div class="works-list">
-            ${(artist.works||[]).map(w => `
+            
               <div class="work-card">
-                <span style="width:300px;">${w.title}</span>
-                ${w.img ? `<img src="${w.img}" loading="lazy" alt="${w.title}"/>` : ''}
+                <span style="width:300px;">${artist.works}</span>
+                ${artist.workslink ? `<img src="${artist.workslink}" loading="lazy" alt=""/>` : ''}
               </div>
-            `).join('')}
+            
+             <div class="work-card">
+                <span style="width:300px;">${artist.works}</span>
+                ${artist.workslink ? `<img src="${artist.workslink}" loading="lazy" alt=""/>` : ''}
+              </div>
+            
+             <div class="work-card">
+                <span style="width:300px;">${artist.works}</span>
+                ${artist.workslink ? `<img src="${artist.workslink}" loading="lazy" alt=""/>` : ''}
+              </div>
+            
+            
           </div>
           </div>
-          <h4>Timeline</h4>
+
+        
+          
+
+
         </div>
       `;
       entry.addEventListener('click', function(e) {

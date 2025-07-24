@@ -1,4 +1,5 @@
 
+ 
     html, body {
       margin: 0;
       padding: 0;
@@ -9,6 +10,15 @@
       min-height: 100vh;
       
     }
+
+.slide-image {
+  width: 50px;
+  border-radius: 10px;
+}
+
+#slide-img {
+  width: 50px;
+}
 
 .title-container {
   font-family: monospace;
@@ -28,12 +38,7 @@
       border-radius: 10px;
       background: #f9f9f9;
     }
-    img {
-      max-width: 100%;
-      max-height: 300px;
-      border-radius: 6px;
-      margin-bottom: 1em;
-    }
+    
     button {
       padding: 0.5em 1.2em;
       margin: 0 10px;
@@ -197,8 +202,8 @@
     }
 
     .artist-pp {
-      width: 30px;
-      height: 30px;
+      width: 10px;
+      height: 10px;
       border-radius: 50%;
       margin-top: 10px;
       margin-left: 10px;
@@ -229,6 +234,24 @@
       font-size: 0.97em;
       color: #b8c1ec;
       margin-left: 5%;
+    }
+
+    .artist-genre {
+      font-size: 0.97em;
+      color: #b8c1ec;
+      margin-left: 5%;
+    }
+
+    .facts-container {
+      display: grid;
+    }
+
+    .facts {
+      color: black;
+    }
+
+    .links-container {
+      display: grid;
     }
 
     .dropdown {

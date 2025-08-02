@@ -1,66 +1,106 @@
 <?php
-
 // Replace with your actual database credentials
 $host = 'localhost';
 $user = 'root';
 $password = '';
 $database = 'mysql';
 
+// Utility function to create user directory, subfolders, and store JSON
+function createUserFolderAndJson($firstname, $lastname, $email, $pword, $date, $country, $why) {
+    // Sanitize folder name: only allow letters, numbers, hyphens, underscores
+    $folderName = preg_replace('/[^a-zA-Z0-9_\-]/', '_', strtolower($firstname . '_' . $lastname));
+    $baseDir = __DIR__ . '/p-users';
+    if (!is_dir($baseDir)) mkdir($baseDir, 0777, true);
+    $userDir = $baseDir . '/' . $folderName;
+    if (!is_dir($userDir)) mkdir($userDir, 0777, true);
+
+    // Create 'pp' and 'work' subfolders
+    $ppDir = $userDir . '/pp';
+    $workDir = $userDir . '/work';
+    if (!is_dir($ppDir)) mkdir($ppDir, 0777, true);
+    if (!is_dir($workDir)) mkdir($workDir, 0777, true);
+
+    // Create or update user.json in that folder
+    $userData = [
+        'firstname' => $firstname,
+        'lastname'  => $lastname,
+        'email'     => $email,
+        'pword'     => $pword,
+        'date'      => $date,
+        'country'   => $country,
+        'why'       => $why
+    ];
+
+    $jsonPath = $userDir . '/user.json';
+    file_put_contents($jsonPath, json_encode($userData, JSON_PRETTY_PRINT));
+    // Optionally, set permissions
+    @chmod($jsonPath, 0666);
+}
+
+// Handle form submission
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Get POST data safely
+    $firstname = isset($_POST['firstname']) ? trim($_POST['firstname']) : '';
+    $lastname = isset($_POST['lastname']) ? trim($_POST['lastname']) : '';
+    $email = isset($_POST['email']) ? trim($_POST['email']) : '';
+    $pword = isset($_POST['pword']) ? trim($_POST['pword']) : '';
+    $date = isset($_POST['date']) ? trim($_POST['date']) : '';
+    $country = isset($_POST['country']) ? trim($_POST['country']) : '';
+    $why = isset($_POST['why']) ? trim($_POST['why']) : '';
+
+    // Simple validation (optional, improve as needed)
+    if ($firstname && $lastname && $email && $pword && $date && $country && $why) {
+        // Connect to MySQL
+        $conn = new mysqli($host, $user, $password, $database);
+
+        if ($conn->connect_error) {
+            die('Connection failed: ' . $conn->connect_error);
+        }
+
+        // Prepare statement to avoid SQL injection
+        $stmt = $conn->prepare("INSERT INTO pusers (firstname, lastname, email, pword, date, country, why) VALUES (?, ?, ?, ?, ?, ?, ?)");
+        $stmt->bind_param("sssssss", $firstname, $lastname, $email, $pword, $date, $country, $why);
+
+        if ($stmt->execute()) {
+            // Create user folder, subfolders, and save JSON data
+            createUserFolderAndJson($firstname, $lastname, $email, $pword, $date, $country, $why);
+           // Redirect to avoid resubmission
+            header('Location: signup.php?success=1');
+            exit;
+        } else {
+            echo "<p>Error: " . $stmt->error . "</p>";
+        }
+        $stmt->close();
+        $conn->close();
+    } else {
+        echo "<p>Please fill in all fields!</p>";
+    }
+}
+
+// Show a message if redirected after successful signup
+if (isset($_GET['success']) && $_GET['success'] == '1') {
+    $successMsg = "<p>Thank you! Your data has been submitted.</p>";
+}
+
+
+
 // Now fetch and display all users
 $conn = new mysqli($host, $user, $password, $database);
 if ($conn->connect_error) {
     die('Connection failed: ' . $conn->connect_error);
 }
-$result = $conn->query("SELECT id, firstname, lastname, date, genre, country, bio, pp, fact1, fact2, fact3, link1, link2, link3, work1, work1link, work2, work2link, work3, work3link, work4, work4link, work5, work5link, work6, work6link FROM users ORDER BY id DESC");
+$result = $conn->query("SELECT id, firstname, lastname, email, pword, date, country, why FROM pusers ORDER BY id DESC");
 
 // Create json array from fetched data
 $jsonArray = array();
 if ($result && $result->num_rows > 0) {
     while ($row = $result->fetch_assoc()) {
-        $jsonArray[] = [
-            "id" => $row["id"],
-            "firstname" => $row["firstname"],
-            "lastname" => $row["lastname"],
-            "date" => $row["date"],
-            "genre" => $row["genre"],
-            "country" => $row["country"],
-            "fact1" => $row["fact1"],
-            "fact2" => $row["fact2"],
-            "fact3" => $row["fact3"],
-            "bio" => $row["bio"],
-            "pp" => $row["pp"],
-            "link1" => $row["link1"],
-            "link2" => $row["link2"],
-            "link3" => $row["link3"],
-            "work1" => $row["work1"],
-            "work1link" => $row["work1link"],
-            "work2" => $row["work2"],
-            "work2link" => $row["work2link"],
-            "work3" => $row["work3"],
-            "work3link" => $row["work3link"],
-            "work4" => $row["work4"],
-            "work4link" => $row["work4link"],
-            "work5" => $row["work5"],
-            "work5link" => $row["work5link"],
-            "work6" => $row["work6"],
-            "work6link" => $row["work6link"]
-        ];
+        $jsonArray[] = $row;
     }
 }
 ?>
 
-<?php
-$photoDir = __DIR__ . '/slideworks';
-$images = [];
-if (is_dir($photoDir)) {
-    $files = scandir($photoDir);
-    foreach ($files as $file) {
-        if (preg_match('/\.(jpg|jpeg|png|gif)$/i', $file)) {
-            $images[] = 'slideworks/' . $file;
-        }
-    }
-}
-?>
+
 
 <!DOCTYPE html>
 <html lang="en">
@@ -69,23 +109,70 @@ if (is_dir($photoDir)) {
   <title>digital artist database</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="stylesheet" type="text/css" href="style.css">
+
+   
+
 </head>
 <body>
+
 
 
 
 <div style="display:flex;">
   <div class="title-container">
     <br>
-    digital <br>artist <br>database.  
+    <a href="index.php" style="text-decoration:none; color: white;">digital <br>artist <br>database</a>
   </div>
+<div  id="dot" style="width:19px; height:19px; box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.1); background-image: linear-gradient(to bottom right, rgba(226, 121, 121, 0.936), rgba(237, 143, 209, 0.936)); align-self: end; border-radius:50%; margin-bottom:50px;"></div>
+
   <p style="color:black; font-size:15px; margin-left:10px; align-self:end;">[alpha]</p>
 </div>
 
+ <div style="display:flex; align-content:center; justify-content:center;">
+     <div class="nav-button"><a href="signup.php">[sign up]</a></div><div class="nav-button"><a href="contribute.php">[contribute]</a></div><div class="nav-button"><a href="database.php">[database]</a></div><div class="nav-button"><a href="studio.php">[studio]</a></div>
+  </div>
 
+
+
+<script>
+        // Set a JS variable to the PHP-generated JSON array
+        var usersData = <?php echo json_encode($jsonArray, JSON_PRETTY_PRINT); ?>;
+        console.log(usersData); // You can use usersData in your JS code
+    </script>
+
+</head>
+<body>
+
+<div class="container-container-container" style="display:grid; align-items:center; justify-items: center;"> 
+<div class="container-container" style="border: double; border-radius:20px; padding-top:50px; width:90%; align-items:center; justify-items: center; display:grid;   background-color: #f2e9e9; box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.1);">
+    
+    <h1 style="color:black;">Submit Your Data</h1>
+
+    <div class="containerone">
+
+    <form method="POST" action="">
+
+        <label class="formlabel" style="color:black;">first name:<br><input type="text" name="firstname" required></label><br><br>
+        <label class="formlabel" >last name:<br><input type="text" name="lastname" required></label><br><br>
+        <label class="formlabel" >Email:<br><input type="email" name="email" required></label><br><br>
+        <label> password:<br><input type="text" name="pword" required></label><br><br>
+        <label> date of dirth:<br><input type="text" name="date" required></label><br><br>
+        <label> country:<br><input type="text" name="country" required></label><br><br>
+        <label>why:<br><textarea name="why" required></textarea></label><br><br>
+       
+        <button type="submit">Submit</button>
+
+    </form>
+
+    
+
+    
+
+  </div>
 
   
-
+    </div>
+    </div>
   
 
   <script async

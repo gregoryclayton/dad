@@ -1,8 +1,9 @@
 
+  
     html, body {
       margin: 0;
       padding: 0;
-      background: #8f9ad1;
+      background: #fefefe;
       color: #fff;
       font-family: monospace;
       height: 100%;
@@ -10,7 +11,63 @@
       
     }
 
-  
+  a { 
+    text-decoration: none;
+   
+    
+  }
+
+   .signin-bar {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 1em;
+      padding: 1em 2em 0.7em 2em;
+      background: #f4f3fa;
+      border-bottom: 1px solid #e2e2e2;
+      font-family: Arial, sans-serif;
+    }
+    .signin-bar input[type="email"], .signin-bar input[type="password"] {
+      padding: 0.4em 0.7em;
+      border-radius: 6px;
+      border: 1px solid #bbb;
+      font-size: 1em;
+    }
+    .signin-bar input[type="submit"] {
+      padding: 0.4em 1.2em;
+      border-radius: 6px;
+      border: none;
+      background: #d1a9fa;
+      font-size: 1em;
+      cursor: pointer;
+    }
+    .signin-bar .signin-msg {
+      margin-left: 1.5em;
+      color: #b00;
+      font-size: 1em;
+      font-weight: 500;
+    }
+    .signin-bar .signin-success {
+      color: #096a09;
+    }
+    .signin-bar .signed-in {
+      color: #222;
+      font-weight: 600;
+      margin-left: 1em;
+    }
+    .signin-bar form {
+      display: flex;
+      gap: 0.7em;
+      align-items: center;
+    }
+
+  .subtitles {
+    color:black;
+  }
+
+  .formlabel {
+    color:black;
+  }
 
 .slide-image {
   width: 50px;
@@ -30,17 +87,28 @@
 .nav-button {
 color: rgb(0, 0, 0);
 font-family: monospace;
-margin: 20px;
-margin-left: 20px;
+margin:10px;
+
 }
 
 .title-container {
+  
+  padding:10px;
+  width: 176px;
+  height: 180px;
+  
   font-family: monospace;
   font-size: 40px;
-  background-color: #ffffff00;
+  background: #b44b64c3;
   margin: 50px;
   margin-left: 50px;
   margin-top: 50px;
+  justify-content: end;
+  align-content: end;
+  box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.1);
+  border-radius: 10px;
+  background-image: linear-gradient(to bottom right, rgba(226, 121, 121, 0.936), rgba(237, 143, 209, 0.936));
+   
 
 }
 
@@ -48,10 +116,11 @@ margin-left: 20px;
       width: 80%;
       margin: 2em auto;
       text-align: center;
-      border: 2px solid #ccc;
-      padding: 1em;
+      border: 1px solid #ccc;
+      padding: 2em;
       border-radius: 10px;
       background: #f9f9f9;
+       box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.1);
     }
     
     button {
@@ -66,16 +135,23 @@ margin-left: 20px;
       height: 100vh;
       overflow-y: auto;
       background-color: rgba(255, 255, 255, 0);
+      
       display: flex;
       flex-direction: column;
       align-items: center;
+       scrollbar-width: none; /* Firefox */
     }
+
+    #container::-webkit-scrollbar { /* WebKit */
+    width: 0;
+    height: 0;
+}
     
     .artist-entry {
-      width: 85%;
+      width: 95%;
       
       margin: 0.4em auto;
-      background: #4b7eb4c3;
+      background-color: rgb(235, 168, 168);
       border-radius: 12px;
       box-shadow: 0 2px 10px #0004;
       
@@ -84,7 +160,7 @@ margin-left: 20px;
       position: relative;
     }
     .artist-entry:hover {
-      background: #393e6e;
+      background: #f883ae;
       transform: scale(1.016);
     }
 
@@ -100,32 +176,32 @@ margin-left: 20px;
       font-size: 1.23em;
       font-weight: 600;
       letter-spacing: 1px;
-      color: #ffe066;
+      color: #ffffff;
       margin-left: 1.2em;
     }
     .artist-lastname {
       font-size: 1.23em;
       font-weight: 600;
       letter-spacing: 1px;
-      color: #ffe066;
+      color: #ffffff;
       margin-left: 1.2em;
     }
 
     .artist-date {
       font-size: 0.97em;
-      color: #b8c1ec;
+      color: #000000;
       margin-left: 5%;
     }
 
     .artist-country {
       font-size: 0.97em;
-      color: #b8c1ec;
+      color: #000000;
       margin-left: 5%;
     }
 
     .artist-genre {
       font-size: 0.97em;
-      color: #b8c1ec;
+      color: #000000;
       margin-left: 5%;
     }
 
@@ -157,8 +233,16 @@ margin-left: 20px;
       transition: max-height 0.42s cubic-bezier(.53,1.4,.56,.95), opacity 0.36s;
       font-size: 1em;
       padding: 0 1em;
+      scrollbar-width: none; /* Firefox */
 
     }
+
+
+    .dropdown::-webkit-scrollbar { /* WebKit */
+    width: 0;
+    height: 0;
+}
+    
     .artist-entry.open .dropdown {
       max-height: 500px;
       opacity: 1;
@@ -174,7 +258,13 @@ margin-left: 20px;
       overflow: scroll;
       gap: 0.8em;
       margin-top: 0.5em;
+      scrollbar-width: none; /* Firefox */
       
+    }
+
+    .works-list::-webkit-scrollbar { /* WebKit */
+    width: 0;
+    height: 0;
     }
     .work-card {
       background: #b8c1ec;
@@ -204,4 +294,3 @@ margin-left: 20px;
    
       #addArtistForm { min-width: 0; width: 98vw; padding: 1em 0.7em 1em 0.7em; }
     }
-

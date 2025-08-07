@@ -1,4 +1,6 @@
 <?php
+// Start session at the beginning
+session_start();
 
 // Replace with your actual database credentials
 $host = 'localhost';
@@ -6,6 +8,183 @@ $user = 'root';
 $password = '';
 $database = 'mysql';
 
+$signin_error = "";
+$signin_success = false;
+$workMsg = "";
+$uploadMsg = "";
+
+// Process all forms and redirects before any HTML output
+if (isset($_SESSION['user_id'])) {
+    $user_id = $_SESSION['user_id'];
+    $profilePath = __DIR__ . "/p-users/" . $_SESSION['user_firstname'] . "_" . $_SESSION['user_lastname'] . "/profile.json";
+    $ppDir = __DIR__ . "/p-users/" . $_SESSION['user_firstname'] . "_" . $_SESSION['user_lastname'] . "/pp";
+    $workDir = __DIR__ . "/p-users/" . $_SESSION['user_firstname'] . "_" . $_SESSION['user_lastname'] . "/work";
+
+    // Handle work upload - before any HTML output
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['work_upload'])) {
+        if (!file_exists($workDir)) mkdir($workDir, 0777, true);
+
+        $title = trim($_POST['work_title'] ?? "");
+        $date = trim($_POST['work_date'] ?? "");
+        $bio = trim($_POST['work_bio'] ?? "");
+        $file = $_FILES['work_image'] ?? null;
+
+        $allowed = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/gif' => 'gif'];
+        if ($file && $file['error'] === 0 && isset($allowed[$file['type']])) {
+            $ext = $allowed[$file['type']];
+            $safeTitle = preg_replace('/[^a-zA-Z0-9_\-]/', '_', strtolower(substr($title, 0, 20)) ?: 'work');
+            $filename = $safeTitle . "_" . time() . "." . $ext;
+            $dest = $workDir . "/" . $filename;
+            $relDest = "/p-users/" . $_SESSION['user_firstname'] . "_" . $_SESSION['user_lastname'] . "/work/" . $filename;
+
+            if (move_uploaded_file($file['tmp_name'], $dest)) {
+                // Update profile.json
+                $profileData = [];
+                if (file_exists($profilePath)) {
+                    $profileData = json_decode(file_get_contents($profilePath), true);
+                    if (!$profileData) $profileData = [];
+                }
+                if (!isset($profileData['works']) || !is_array($profileData['works'])) $profileData['works'] = [];
+                $profileData['works'][] = [
+                    'title' => $title,
+                    'date' => $date,
+                    'bio' => $bio,
+                    'img' => $relDest
+                ];
+                file_put_contents($profilePath, json_encode($profileData, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+                
+                // Store success message in session and redirect
+                $_SESSION['work_upload_success'] = true;
+                header("Location: studio2.php");
+                exit;
+            } else {
+                $workMsg = "<span style='color:#ffbfbf;'>Upload failed.</span>";
+            }
+        } else {
+            $workMsg = "<span style='color:#ffbfbf;'>Invalid file type or error.</span>";
+        }
+    }
+
+    // Check for success message from session
+    if (isset($_SESSION['work_upload_success'])) {
+        $workMsg = "<span style='color:#bfffbf;'>Work image uploaded!</span>";
+        unset($_SESSION['work_upload_success']);
+    }
+
+
+// Handle comments form POST
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_comment'])) {
+    $c_name = trim($_POST['comment_name'] ?? '');
+    $c_email = trim($_POST['comment_email'] ?? '');
+    $c_message = trim($_POST['comment_message'] ?? '');
+    if ($c_name && $c_email && $c_message) {
+        $conn_comment = new mysqli($host, $user, $password, $database);
+        if (!$conn_comment->connect_error) {
+            // First, check if the comments table exists
+            
+            
+            // Now insert the comment
+            $stmt = $conn_comment->prepare("INSERT INTO comments (name, email, message) VALUES (?, ?, ?)");
+            $stmt->bind_param("sss", $c_name, $c_email, $c_message);
+            if ($stmt->execute()) {
+                // Success! Store in session and redirect
+                $_SESSION['comment_success'] = true;
+                header("Location: studio2.php");
+                exit;
+            } else {
+                $_SESSION['comment_error'] = "Error submitting comment: " . $stmt->error;
+                header("Location: studio2.php");
+                exit;
+            }
+            $stmt->close();
+        } else {
+            $_SESSION['comment_error'] = "Database connection error";
+            header("Location: studio2.php");
+            exit;
+        }
+    } else {
+        $_SESSION['comment_error'] = "Please fill in all fields";
+        header("Location: studio2.php");
+        exit;
+    }
+}
+
+// Check for comment success or error messages from session
+$comment_msg = "";
+if (isset($_SESSION['comment_success'])) {
+    $comment_msg = "<span style='color:#bfffbf;'>Thank you! Your comment has been submitted.</span>";
+    unset($_SESSION['comment_success']);
+} else if (isset($_SESSION['comment_error'])) {
+    $comment_msg = "<span style='color:#ffbfbf;'>" . $_SESSION['comment_error'] . "</span>";
+    unset($_SESSION['comment_error']);
+}
+
+    // Handle profile image upload
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['profile_image'])) {
+        if (!file_exists($ppDir)) {
+            mkdir($ppDir, 0777, true);
+        }
+        $file = $_FILES['profile_image'];
+        $allowed = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/gif' => 'gif'];
+        if ($file['error'] === 0 && isset($allowed[$file['type']])) {
+            $ext = $allowed[$file['type']];
+            $dest = $ppDir . "/profile." . $ext;
+            $relDest = "/p-users/" . $_SESSION['user_firstname'] . "_" . $_SESSION['user_lastname'] . "/pp/profile." . $ext; // relative path for JSON
+            // Move the uploaded file
+            if (move_uploaded_file($file['tmp_name'], $dest)) {
+                $uploadMsg = "<span style='color:#bfffbf;'>Profile picture uploaded!</span>";
+                // Update JSON file
+                if (file_exists($profilePath)) {
+                    $profileData = json_decode(file_get_contents($profilePath), true);
+                    if (!$profileData) $profileData = [];
+                } else {
+                    $profileData = [];
+                }
+                $profileData['pp'] = $relDest;
+                file_put_contents($profilePath, json_encode($profileData, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+            } else {
+                $uploadMsg = "<span style='color:#ffbfbf;'>Upload failed.</span>";
+            }
+        } else {
+            $uploadMsg = "<span style='color:#ffbfbf;'>Invalid file type or error.</span>";
+        }
+    }
+}
+
+// Handle sign in POST
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signin_email'], $_POST['signin_pword'])) {
+    $signin_email = trim($_POST['signin_email']);
+    $signin_pword = trim($_POST['signin_pword']);
+
+    // Simple lookup (do NOT use plain passwords in production!)
+    $conn2 = new mysqli($host, $user, $password, $database);
+    if ($conn2->connect_error) {
+        $signin_error = 'Connection failed.';
+    } else {
+        $stmt = $conn2->prepare("SELECT id, firstname, lastname FROM pusers WHERE email=? AND pword=? LIMIT 1");
+        $stmt->bind_param("ss", $signin_email, $signin_pword);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        if ($user = $result->fetch_assoc()) {
+            $_SESSION['user_id'] = $user['id'];
+            $_SESSION['user_firstname'] = $user['firstname'];
+            $_SESSION['user_lastname'] = $user['lastname'];
+            $signin_success = true;
+        } else {
+            $signin_error = "Email or password is incorrect.";
+        }
+        $stmt->close();
+        $conn2->close();
+    }
+}
+
+// Handle signout
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signout'])) {
+    session_destroy();
+    header("Location: v4.5.php");
+    exit;
+}
+$user = 'root';
 // Now fetch and display all users
 $conn = new mysqli($host, $user, $password, $database);
 if ($conn->connect_error) {
@@ -74,64 +253,430 @@ if (is_dir($photoDir)) {
 
 
 
+
+
 <div style="display:flex;">
-  <div class="title-container">
+  <div class="title-container" id="mainTitleContainer" style="background-image: linear-gradient(135deg, #e27979 60%, #ed8fd1 100%); transition: background-image 0.7s;">
     <br>
     <a href="index.php" style="text-decoration:none; color: white;">digital <br>artist <br>database</a>
   </div>
-<div  id="dot" style="width:19px; height:19px; box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.1); background-image: linear-gradient(to bottom right, rgba(226, 121, 121, 0.936), rgba(237, 143, 209, 0.936)); align-self: end; border-radius:50%; margin-bottom:50px;"></div>
-
+  
+   <div id="dotMenuContainer" style="position:relative; align-self:end; margin-bottom:50px; margin-left:-30px;">
+    <div id="dot" style="color:black; background: linear-gradient(135deg, #e27979 60%, #ed8fd1 100%); transition: background 0.7s;"></div>
+    <div id="dotMenu" style="display:none; position:absolute; left:50%; top:-380%; transform:translateX(-50%); background-image: linear-gradient(to bottom right, rgba(226, 121, 121, 0.936), rgba(237, 143, 209, 0.936)); border-radius:50%; box-shadow:0 4px 24px #0002; padding:1.4em 2em; min-width:120px; z-index:1000;">
+      <!-- Your menu content here -->
+      <a href="v4.5.php" style="color:#777; text-decoration:none; display:block; margin-bottom:0.5em;">Home</a>
+      <a href="about.php" style="color:#777; text-decoration:none; display:block; margin-bottom:0.5em;">About</a>
+      <a href="signup.php" style="color:#b44; text-decoration:none; display:block; margin-bottom:0.5em;">Sign Up</a>
+      <a href="contribute.php" style="color:#a56; text-decoration:none; display:block; margin-bottom:0.5em;">Contribute</a>
+      <a href="database.php" style="color:#555; text-decoration:none; display:block; margin-bottom:0.5em;">Database</a>
+      <a href="studio.php" style="color:#777; text-decoration:none; display:block;">Studio</a>
+      <!-- New buttons for changing color -->
+      <button id="changeTitleBgBtn" style="margin-top:1em; background:#e27979; color:#fff; border:none; border-radius:8px; padding:0.6em 1.1em; font-family:monospace; font-size:1em; cursor:pointer; display:block; width:100%;">Change Colors</button>
+      <button id="bwThemeBtn" style="margin-top:0.7em; background:#232323; color:#fff; border:none; border-radius:8px; padding:0.6em 1.1em; font-family:monospace; font-size:1em; cursor:pointer; display:block; width:100%;">Black & White Theme</button>
+    </div>
+  </div>
   <p style="color:black; font-size:15px; margin-left:10px; align-self:end;">[alpha]</p>
 </div>
 
- <div style="display:flex; align-content:center; justify-content:center;">
-     <div class="nav-button"><a href="signup.php">[sign up]</a></div><div class="nav-button"><a href="contribute.php">[contribute]</a></div><div class="nav-button"><a href="database.php">[database]</a></div><div class="nav-button"><a href="studio.php">[studio]</a></div>
+
+<!-- Pop-out menu for quick nav, hidden by default -->
+<div id="titleMenuPopout" style="display:none; position:fixed; z-index:10000; top:65px; left:40px; background: white; border-radius:14px; box-shadow:0 4px 24px #0002; padding:1.4em 2em; min-width:80px; font-family:monospace;">
+  <div style="display:flex; flex-direction:column; gap:0.5em;">
+    <a href="v4.5.php" style="color:#777; text-decoration:none; font-size:1.1em;">home</a>
+    <a href="v4.5.php" style="color:#777; text-decoration:none; font-size:1.1em;">about</a>
+    <a href="signup.php" style="color:#b44; text-decoration:none; font-size:1.1em;">sign up</a>
+    <a href="contribute.php" style="color:#a56; text-decoration:none; font-size:1.1em;">contribute</a>
+    <a href="database.php" style="color:#555; text-decoration:none; font-size:1.1em;">database</a>
+    <a href="studio.php" style="color:#777; text-decoration:none; font-size:1.1em;">studio</a>
+   
   </div>
+</div>
 
-  
 
-  
+<!-- SIGN IN BAR AT TOP -->
+<div class="signin-bar" style="width:88vw; justify-content: baseline;border-bottom-right-radius:10px; border-top-right-radius:10px;">
+  <?php if (isset($_SESSION['user_id'])): ?>
+    <span class="signed-in">Signed in as <?php echo htmlspecialchars($_SESSION['user_firstname'] . ' ' . $_SESSION['user_lastname']); ?></span>
+    <form method="post" style="margin:0;">
+      <input type="hidden" name="signout" value="1" />
+      <input type="submit" value="Sign Out" />
+    </form>
+  <?php else: ?>
+    <form method="post" autocomplete="off">
+      <input type="email" style="width:100px;" name="signin_email" required placeholder="email" />
+      <input type="password" style="width:100px;" name="signin_pword" required placeholder="password" />
+      <input type="submit" value="sign in" />
+    </form>
+    <?php if ($signin_error): ?>
+      <span class="signin-msg"><?php echo htmlspecialchars($signin_error); ?></span>
+    <?php elseif ($signin_success): ?>
+      <span class="signin-msg signin-success">Signed in!</span>
+    <?php endif; ?>
+  <?php endif; ?>
+</div>
 
- 
 <br>
-  <br>
 
-<div class="container-container-container" style="display:grid; align-items:center; justify-items: center;"> 
-<div class="container-container" style="border: double; border-radius:20px; padding-top:50px; width:90%; align-items:center; justify-items: center; display:grid;   background-color: #f2e9e9; box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.1);">
 
-<div style="display:flex; justify-content: center; align-items:center;">
-  <div>
-    <input type="text" id="artistSearchBar" placeholder="Search artists..." style="width:60vw; padding:0.6em 1em; font-size:1em; border-radius:7px; border:1px solid #ccc;">
+ <div style="display:flex; align-content:center; justify-content:center;">
+    <div class="nav-button"><a href="signup.php">[sign up]</a></div><div class="nav-button"><a href="contribute.php">[contribute]</a></div><div class="nav-button"><a href="database.php">[database]</a></div><div class="nav-button"><a href="studio.php">[studio]</a></div>
   </div>
-</div>
 
-<!-- SORT BUTTONS AND SEARCH BAR ROW (MODIFIED) -->
-<div style="display:flex; justify-content:center; align-items:center; margin:1em 0 1em 0;">
-  <!-- SEARCH BAR MOVED TO THE LEFT -->
+<br>
+ 
+<div class="profileinfo" style="width:100%; min-height:30vh; background-color:lightgrey; color:white; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+<?php
+if (isset($_SESSION['user_id'])) {
+    $user_id = $_SESSION['user_id'];
+    $profilePath = __DIR__ . "/p-users/" . $_SESSION['user_firstname'] . "_" . $_SESSION['user_lastname'] . "/profile.json";
+    $ppDir = __DIR__ . "/p-users/" . $_SESSION['user_firstname'] . "_" . $_SESSION['user_lastname'] . "/pp";
+
+ // --- BEGIN: VISIT PROFILE BUTTON ---
+    // Show "visit profile" button at the top of profile info
+  // Show "visit profile" button at the top of profile info
+$profile_url = "profile.php?artist=" . urlencode($_SESSION['user_firstname'] . "_" . $_SESSION['user_lastname']);
+echo '<div style="margin-top:16px; margin-bottom:18px; text-align:center;">';
+echo '<a href="' . htmlspecialchars($profile_url) . '" style="background:#e8bebe; color:#222; padding:0.7em 2em; border-radius:7px; font-family:monospace; font-size:1.06em; display:inline-block; text-decoration:none; font-weight:bold; box-shadow:0 2px 8px #0002; margin-bottom:8px;">visit profile</a>';
+echo '</div>';
+    // --- END: VISIT PROFILE BUTTON ---
+
+    // Show profile info
+    if (file_exists($profilePath)) {
+        $profileData = json_decode(file_get_contents($profilePath), true);
+        if ($profileData) {
+            echo '<div style="text-align:center;">';
+            if (!empty($profileData['firstname']) || !empty($profileData['lastname'])) {
+                echo '<h2 style="margin:0;">' . 
+                     htmlspecialchars($profileData['firstname'] ?? '') . ' ' . 
+                     htmlspecialchars($profileData['lastname'] ?? '') . 
+                     '</h2>';
+            }
+            if (!empty($profileData['bio'])) {
+                echo '<p>' . htmlspecialchars($profileData['bio']) . '</p>';
+            }
+            if (!empty($profileData['email'])) {
+                echo '<p>Email: ' . htmlspecialchars($profileData['email']) . '</p>';
+            }
+            // Display current profile pic if exists and is set in JSON
+            if (!empty($profileData['pp']) && file_exists(__DIR__ . '/' . $profileData['pp'])) {
+                echo '<img src="' . htmlspecialchars($profileData['pp']) . '" alt="Profile Picture" style="width:100px;height:100px;object-fit:cover;border-radius:50%;margin:10px auto;display:block;background:#fff;" />';
+            }
+            echo '</div>';
+        } else {
+            echo '<span>Profile data could not be loaded.</span>';
+        }
+    } else {
+        echo '<span>No profile found for this user.</span>';
+    }
+
+   // Display works if present
+if (!empty($profileData['works']) && is_array($profileData['works'])) {
+    echo '<div style="margin-top:18px; text-align:center;">';
+    echo '<h3 style="margin-bottom:8px;">My Works</h3>';
+    echo '<div style="display:flex; flex-wrap:wrap; gap:20px; justify-content:center;">';
+    
+    $workIndex = 0;
+    foreach ($profileData['works'] as $work) {
+        // Only show if image exists
+        $imgPath = !empty($work['img']) ? __DIR__ . '/' . $work['img'] : '';
+        if (!empty($work['img']) && file_exists($imgPath)) {
+            echo '<div class="work-card" data-index="' . $workIndex . '" style="background:#222; padding:12px; border-radius:12px; min-width:160px; max-width:220px; color:#fff; box-shadow:0 2px 8px #0008; cursor:pointer;">';
+            echo '<img src="' . htmlspecialchars($work['img']) . '" alt="Work Image" style="width:120px;height:120px;object-fit:cover;border-radius:8px; background:#fff; display:block; margin:0 auto 8px auto;">';
+            if (!empty($work['title'])) {
+                echo '<div style="font-weight:bold; margin-bottom:2px;">' . htmlspecialchars($work['title']) . '</div>';
+            }
+            if (!empty($work['date'])) {
+                echo '<div style="font-size:0.92em; color:#b0e0ff; margin-bottom:4px;">' . htmlspecialchars($work['date']) . '</div>';
+            }
+            if (!empty($work['bio'])) {
+                echo '<div style="font-size:0.97em; color:#e0e0e0;">' . nl2br(htmlspecialchars($work['bio'])) . '</div>';
+            }
+            echo '</div>';
+            
+            $workIndex++;
+        }
+    }
+    echo '</div></div>';
+    
+    // Add hidden modal container at the end of this section
+    echo '<div id="workModal" style="display:none; position:fixed; z-index:1000; left:0; top:0; width:100%; height:100%; background-color:rgba(0,0,0,0.85); overflow:auto;">
+        <div style="position:relative; margin:5% auto; padding:20px; width:85%; max-width:900px; animation:modalFadeIn 0.3s;">
+            <span id="closeModal" style="position:absolute; top:10px; right:20px; color:white; font-size:28px; font-weight:bold; cursor:pointer;">&times;</span>
+            <div id="modalContent" style="background:#333; padding:25px; border-radius:15px; color:white;"></div>
+        </div>
+    </div>';
+    
+    // Store works data as JSON for JavaScript access
+    echo '<script>
+        const worksData = ' . json_encode($profileData['works']) . ';
+    </script>';
+}
+
+    // Show upload message, if any
+    if (!empty($uploadMsg)) {
+        echo '<div style="margin:10px 0;">' . $uploadMsg . '</div>';
+    }
+    
+    // Create a flex container for the forms
+    echo '<div style="display: flex; flex-wrap: wrap; gap: 20px; width: 90%; max-width: 1200px; margin-top: 20px;">';
+    
+    // Left side container for image upload and work upload forms
+    echo '<div style="flex: 1; min-width: 300px;">';
+    
+    // Image upload form:
+    ?>
+    <form action="" method="post" enctype="multipart/form-data" style="margin-top:12px;">
+      <label for="profile_image">Upload profile image:</label>
+      <input type="file" name="profile_image" id="profile_image" accept="image/*" required>
+      <input type="submit" value="Upload">
+      <div style="font-size:0.9em;color:#eee;">JPEG, PNG, GIF only.</div>
+    </form>
+    <?php
+    
+    if (isset($_SESSION['user_id'])) {
+        // Show upload message, if any
+        if (!empty($workMsg)) {
+            echo '<div style="margin:10px 0;">' . $workMsg . '</div>';
+        }
+        ?>
+        <form action="" method="post" enctype="multipart/form-data" style="margin-top:16px; border-top:1px solid #fff; padding-top:12px;">
+          <input type="hidden" name="work_upload" value="1" />
+          <div><b>Add a new work</b></div>
+          <div style="margin:6px 0;">
+            <label for="work_title">Title:</label><br>
+            <input type="text" name="work_title" id="work_title" maxlength="80" required style="width:90%;">
+          </div>
+          <div style="margin:6px 0;">
+            <label for="work_date">Date:</label><br>
+            <input type="text" name="work_date" id="work_date" maxlength="40" style="width:90%;" placeholder="e.g. 2025-08-02">
+          </div>
+          <div style="margin:6px 0;">
+            <label for="work_bio">Bio / Description:</label><br>
+            <textarea name="work_bio" id="work_bio" maxlength="500" rows="2" style="width:90%;"></textarea>
+          </div>
+          <div style="margin:6px 0;">
+            <label for="work_image">Upload work image:</label><br>
+            <input type="file" name="work_image" id="work_image" accept="image/*" required>
+          </div>
+          <input type="submit" value="Upload Work">
+          <div style="font-size:0.9em;color:#eee;">JPEG, PNG, GIF only.</div>
+        </form>
+        
+        
+    <?php
+    // Close the left side container
+    echo '</div>';
+    
+    // --- BEGIN: Editable 'pusers' row form - now positioned to the right ---
+    // Fetch the user's current row from 'pusers' table to prefill the form
+    $edit_columns = [
+        'firstname', 'lastname','email', 'date', 'country', 'why'
+    ];
+    $user_edit_data = [];
+
+    $user = 'root';
+    $conn3 = new mysqli($host, $user, $password, $database);
+    if (!$conn3->connect_error) {
+        $stmt = $conn3->prepare("SELECT ".implode(',', $edit_columns)." FROM pusers WHERE id=? LIMIT 1");
+        $stmt->bind_param("i", $_SESSION['user_id']);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        if ($row = $result->fetch_assoc()) {
+            $user_edit_data = $row;
+        }
+        $stmt->close();
+        $conn3->close();
+    }
+
+    // Handle the POST of the edit form
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_profile_submit'])) {
+    $profilePath = __DIR__ . "/p-users/" . $_SESSION['user_firstname'] . "_" . $_SESSION['user_lastname'] . "/profile.json";
+    
+    // Load existing profile data or create new empty array
+    $profileData = [];
+    if (file_exists($profilePath)) {
+        $profileData = json_decode(file_get_contents($profilePath), true);
+        if (!$profileData) $profileData = []; // Handle invalid JSON
+    }
+    
+    // Update profile data with form values
+    $fieldsToUpdate = [
+        'country', 'bio', 'fact1', 'fact2', 'fact3', 'link1', 'link2', 'link3'
+    ];
+    
+    foreach ($fieldsToUpdate as $field) {
+        $profileData[$field] = trim($_POST[$field] ?? '');
+    }
+    
+    // Preserve existing fields that weren't in the form
+    // Make sure firstname and lastname are always set
+    if (!isset($profileData['firstname'])) {
+        $profileData['firstname'] = $_SESSION['user_firstname'];
+    }
+    if (!isset($profileData['lastname'])) {
+        $profileData['lastname'] = $_SESSION['user_lastname'];
+    }
+    
+    // Save profile data back to JSON file
+    $dirPath = dirname($profilePath);
+    if (!file_exists($dirPath)) {
+        mkdir($dirPath, 0777, true);
+    }
+    
+    if (file_put_contents($profilePath, json_encode($profileData, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES))) {
+        // Success message
+        echo "<div style='margin:14px 0;color:#bfffbf;'>Profile updated successfully!</div>";
+        
+        // Update the user_edit_data variable to show updated values in the form
+        $user_edit_data = [];
+        foreach ($fieldsToUpdate as $field) {
+            $user_edit_data[$field] = $profileData[$field];
+        }
+    } else {
+        echo "<div style='margin:14px 0;color:#ffbfbf;'>Error updating profile. Could not write to file.</div>";
+    }
+}
+
+// We still need to load the existing data for displaying in the form
+$user_edit_data = [];
+$profilePath = __DIR__ . "/p-users/" . $_SESSION['user_firstname'] . "_" . $_SESSION['user_lastname'] . "/profile.json";
+if (file_exists($profilePath)) {
+    $profileData = json_decode(file_get_contents($profilePath), true);
+    if ($profileData) {
+        $fieldsToLoad = ['country', 'bio', 'fact1', 'fact2', 'fact3', 'link1', 'link2', 'link3'];
+        foreach ($fieldsToLoad as $field) {
+            $user_edit_data[$field] = $profileData[$field] ?? '';
+        }
+    }
+}
+
+    // Handle the POST of the delete form (deletes user from pusers)
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_profile_submit'])) {
+        $conn5 = new mysqli($host, $user, $password, $database);
+        if (!$conn5->connect_error) {
+            $stmt = $conn5->prepare("DELETE FROM pusers WHERE id=?");
+            $stmt->bind_param("i", $_SESSION['user_id']);
+            if ($stmt->execute()) {
+                // Log the user out and show a message before redirecting
+                session_destroy();
+                echo "<div style='margin:18px 0; color:#bfffbf; background:#223; border-radius:7px; padding:1.5em; font-size:1.1em; max-width:500px;'>Your profile has been deleted. You have been signed out.</div>";
+                echo "<script>
+                    setTimeout(function() {
+                        window.location.href = 'v4.5.php';
+                    }, 2500);
+                </script>";
+                // Stop further output for this request
+                exit;
+            } else {
+                echo "<div style='margin:14px 0;color:#ffbfbf;'>Error deleting profile.</div>";
+            }
+            $stmt->close();
+            $conn5->close();
+        }
+    }
+    
+    // Right side container - Edit Profile form
+    echo '<div style="flex: 1; min-width: 300px;">';
+    ?>
+    <form action="" method="post" style="margin-top:30px; padding-top:30px; background:lightgrey; border-radius:12px; max-width:600px;">
+  <input type="hidden" name="edit_profile_submit" value="1" />
+  <h3 style="color:black; margin-bottom:10px;">Edit Profile Details</h3>
   
- 
+  <!-- First name, last name, date, and email inputs have been removed -->
+  
+  <div style="margin-top:8px;">
+    <label for="country" style="color:#fff;">Country:</label>
+    <input type="text" name="country" id="country" maxlength="40" style="width:99%;" value="<?php echo htmlspecialchars($user_edit_data['country'] ?? ''); ?>">
+  </div>
+  <div style="margin-top:8px;">
+    <label for="bio" style="color:#fff;">Bio:</label>
+    <textarea name="bio" id="bio" maxlength="800" rows="3" style="width:99%;"><?php echo htmlspecialchars($user_edit_data['bio'] ?? ''); ?></textarea>
+  </div>
+  <div style="margin-top:8px;">
+    <label for="fact1" style="color:#fff;">Fact 1:</label>
+    <input type="text" name="fact1" id="fact1" maxlength="120" style="width:99%;" value="<?php echo htmlspecialchars($user_edit_data['fact1'] ?? ''); ?>">
+  </div>
+  <div style="margin-top:8px;">
+    <label for="fact2" style="color:#fff;">Fact 2:</label>
+    <input type="text" name="fact2" id="fact2" maxlength="120" style="width:99%;" value="<?php echo htmlspecialchars($user_edit_data['fact2'] ?? ''); ?>">
+  </div>
+  <div style="margin-top:8px;">
+    <label for="fact3" style="color:#fff;">Fact 3:</label>
+    <input type="text" name="fact3" id="fact3" maxlength="120" style="width:99%;" value="<?php echo htmlspecialchars($user_edit_data['fact3'] ?? ''); ?>">
+  </div>
+  <div style="margin-top:8px;">
+    <label for="link1" style="color:#fff;">Link 1:</label>
+    <input type="text" name="link1" id="link1" maxlength="250" style="width:99%;" value="<?php echo htmlspecialchars($user_edit_data['link1'] ?? ''); ?>">
+  </div>
+  <div style="margin-top:8px;">
+    <label for="link2" style="color:#fff;">Link 2:</label>
+    <input type="text" name="link2" id="link2" maxlength="250" style="width:99%;" value="<?php echo htmlspecialchars($user_edit_data['link2'] ?? ''); ?>">
+  </div>
+  <div style="margin-top:8px;">
+    <label for="link3" style="color:#fff;">Link 3:</label>
+    <input type="text" name="link3" id="link3" maxlength="250" style="width:99%;" value="<?php echo htmlspecialchars($user_edit_data['link3'] ?? ''); ?>">
+  </div>
+  <input type="submit" value="Save Details" style="margin:18px 0 0 0; padding:9px 2em; background:#bfffbf; color:#222; border:none; border-radius:6px; font-size:1.05em; cursor:pointer;">
+</form>
 
-  <button id="sortAlphaBtn" style="padding:0.7em 1.3em; font-family: monospace; font-size:1em; color: black; background-color: rgba(255, 255, 255, 0); border:none; border-radius:8px; cursor:pointer;">
-    name
-  </button>
-  <button id="sortDateBtn" style="padding:0.7em 1.3em; font-family: monospace; font-size:1em; background-color: rgba(255, 255, 255, 0); color:black; border:none; border-radius:8px; cursor:pointer;">
-    date
-  </button>
-  <button id="sortCountryBtn" style="padding:0.7em 1.3em; font-family: monospace; font-size:1em; background-color: rgba(255, 255, 255, 0); color:black; border:none; border-radius:8px; cursor:pointer;">
-    country
-  </button>
-  <button id="sortGenreBtn" style="padding:0.7em 1.3em; font-family: monospace; font-size:1em; background-color: rgba(255, 255, 255, 0); color:black; border:none; border-radius:8px; cursor:pointer;">
-    genre
-  </button>
+
+       <!-- NEW: Comments Dropdown with Form -->
+<div style="max-width:600px; margin:18px auto;">
+  <details style="background:#23235e; border-radius:10px; color:#fff; padding:14px; margin-top:14px;">
+    <summary style="cursor:pointer; font-size:1.1em; font-weight:bold; outline:none;">Leave a comment or question</summary>
+    <div style="margin-top:18px;">
+    <?php
+    // Display any comment messages
+    if (!empty($comment_msg)) {
+        echo "<div style='margin-bottom:12px;'>$comment_msg</div>";
+    }
+    ?>
+      <form method="post" style="display:flex; flex-direction:column; gap:14px;">
+        <input type="hidden" name="submit_comment" value="1" />
+        <label>
+          Name:<br>
+          <input type="text" name="comment_name" maxlength="60" required style="width:100%; padding:6px; border-radius:6px; border:1px solid #bbb;">
+        </label>
+        <label>
+          Email:<br>
+          <input type="email" name="comment_email" maxlength="80" required style="width:100%; padding:6px; border-radius:6px; border:1px solid #bbb;">
+        </label>
+        <label>
+          Message:<br>
+          <textarea name="comment_message" maxlength="800" rows="3" required style="width:100%; padding:6px; border-radius:6px; border:1px solid #bbb;"></textarea>
+        </label>
+        <button type="submit" style="background:#bfffbf; color:#222; border:none; border-radius:6px; font-size:1em; padding:9px 0; cursor:pointer;">Send Comment</button>
+      </form>
+    </div>
+  </details>
 </div>
- 
+        
+        <!-- Delete Profile Button -->
+        <form action="" method="post" onsubmit="return confirm('Are you sure you want to delete your profile? This cannot be undone!');" style="margin-top:18px; max-width:600px;">
+          <input type="hidden" name="delete_profile_submit" value="1" />
+          <button type="submit" style="background:#f55; color:#fff; padding:10px 2em; border:none; border-radius:6px; font-size:1em; margin-top:7px; cursor:pointer;">
+            Delete My Profile
+          </button>
+        </form>
 
-  <div id="container"></div>
-
-  <br><br><br><br><br>
+    <?php
+    // Close the right side container
+    echo '</div>';
+    
+    // Close the flex container for all forms
+    echo '</div>';
+        
+    } // End session check for work form
+    
+} else {
+    echo '<span style="color:black;">Please <b>sign in</b> to view your profile information.</span>';
+}
+?>
 
 </div>
-</div> 
+
+
 
 
   <script async
@@ -590,6 +1135,88 @@ window.onload = function () {
 }
 </script>
 -->
+
+<script>
+// Add this at the end of your file, before closing body tag
+document.addEventListener('DOMContentLoaded', function() {
+    // Work card expansion functionality
+    const modal = document.getElementById('workModal');
+    const modalContent = document.getElementById('modalContent');
+    const closeBtn = document.getElementById('closeModal');
+    
+    // Exit if modal elements aren't found (might happen if user has no works)
+    if (!modal || !modalContent || !closeBtn) return;
+    
+    // Add click handler to all work cards
+    document.querySelectorAll('.work-card').forEach(card => {
+        card.addEventListener('click', function() {
+            const index = parseInt(this.getAttribute('data-index'));
+            const work = worksData[index];
+            
+            if (work) {
+                let content = `
+                    <div style="display:flex; flex-direction:column; align-items:center;">
+                        <h2 style="margin-bottom:15px; font-size:24px;">${work.title || 'Untitled Work'}</h2>
+                        
+                        <div style="width:100%; max-width:600px; margin-bottom:20px; text-align:center;">
+                            <img src="${work.img}" alt="${work.title || 'Work Image'}" 
+                                style="max-width:100%; max-height:70vh; object-fit:contain; border-radius:10px; box-shadow:0 4px 20px rgba(0,0,0,0.3);">
+                        </div>
+                        
+                        <div style="width:100%; max-width:700px; text-align:left;">
+                            ${work.date ? '<p style="color:#b0e0ff; margin-bottom:15px; font-size:16px;">Created: ' + work.date + '</p>' : ''}
+                            ${work.bio ? '<div style="line-height:1.6; font-size:16px; margin-top:15px;">' + work.bio.replace(/\n/g, '<br>') + '</div>' : ''}
+                        </div>
+                        
+                        <div style="margin-top:30px;">
+                            <button id="closeModalBtn" style="background:#e27979; color:white; border:none; padding:10px 20px; border-radius:5px; cursor:pointer; font-size:16px;">Close</button>
+                        </div>
+                    </div>
+                `;
+                
+                modalContent.innerHTML = content;
+                modal.style.display = 'block';
+                document.body.style.overflow = 'hidden'; // Prevent scrolling while modal is open
+                
+                // Add event listener to the new close button inside modal
+                document.getElementById('closeModalBtn').addEventListener('click', closeModal);
+            }
+        });
+    });
+    
+    // Close modal when clicking X button
+    closeBtn.addEventListener('click', closeModal);
+    
+    // Close modal when clicking outside content
+    modal.addEventListener('click', function(e) {
+        if (e.target === modal) {
+            closeModal();
+        }
+    });
+    
+    // Close on ESC key
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && modal.style.display === 'block') {
+            closeModal();
+        }
+    });
+    
+    function closeModal() {
+        modal.style.display = 'none';
+        document.body.style.overflow = ''; // Restore scrolling
+    }
+    
+    // Add this CSS for animation
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes modalFadeIn {
+            from {opacity: 0; transform: translateY(-20px);}
+            to {opacity: 1; transform: translateY(0);}
+        }
+    `;
+    document.head.appendChild(style);
+});
+</script>
 
 </body>
 
